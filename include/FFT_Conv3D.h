@@ -1,0 +1,47 @@
+
+#pragma once
+
+#include "SparseMatrix.h"
+#include "mkl.h"
+#include "mkl_dfti.h"
+#include "mkl_service.h"
+#include "cufft.h"
+#include "cuda_runtime.h"
+#include "utils.h"
+
+
+namespace puff{
+
+
+template<typename ValueType, typename MemorySpace> // Derived class
+class FFT3D{
+    FFT3D() {}
+    ~FFT3D() {}
+};
+
+
+template<typename ValueType, typename MemorySpace> // Derived class
+class CONV3D{
+    public:
+        CONV3D() {}
+        ~CONV3D() {}
+
+    private:
+        FFT3D<ValueType, MemorySpace> fft3d;
+};
+
+template<typename ValueType>
+using FFT3D_h = FFT3D<ValueType, cusp::host_memory>;
+
+template<typename ValueType>
+using FFT3D_d = FFT3D<ValueType, cusp::device_memory>;
+
+template<typename ValueType>
+using CONV3D_h = CONV3D<ValueType, cusp::host_memory>;
+
+template<typename ValueType>
+using CONV3D_d = CONV3D<ValueType, cusp::device_memory>;
+
+}
+
+#include "details/FFT_Conv3D.inl"
