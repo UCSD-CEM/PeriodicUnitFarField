@@ -41,7 +41,7 @@ TEST(PUFF, Check_Complex_Array_Host)
         b[i] = puff::complex_d(i, -i);
 	}
 
-    puff::Vector_element_wise_multiply_Constant_h<puff::complex_d>(a, puff::complex_d(3.0, 0.0), c);
+    puff::Vector_element_wise_multiply_Constant(a, puff::complex_d(3.0, 0.0), c);
 
 #ifdef USE_OPENMP
 #pragma omp parallel for
@@ -51,7 +51,7 @@ TEST(PUFF, Check_Complex_Array_Host)
         EXPECT_EQ(c[i], puff::complex_d(3.0 * i, 3.0 * i));
     }
 
-    puff::Vector_element_wise_multiply_Vector_h<puff::complex_d>(a, b, c);
+    puff::Vector_element_wise_multiply_Vector(a, b, c);
 
 #ifdef USE_OPENMP
 #pragma omp parallel for
@@ -81,7 +81,7 @@ TEST(PUFF, Check_Complex_Array_Device)
     d_a = h_a;
     d_b = h_b;
 
-    puff::Vector_element_wise_multiply_Constant_d<puff::complex_d>(d_a, puff::complex_d(3.0, 0.0), d_c);
+    puff::Vector_element_wise_multiply_Constant(d_a, puff::complex_d(3.0, 0.0), d_c);
     h_c = d_c;
 
 #ifdef USE_OPENMP
@@ -92,7 +92,7 @@ TEST(PUFF, Check_Complex_Array_Device)
         EXPECT_EQ(h_c[i], puff::complex_d(3.0 * i, 3.0 * i));
     }
 
-    puff::Vector_element_wise_multiply_Vector_d<puff::complex_d>(d_a, d_b, d_c);
+    puff::Vector_element_wise_multiply_Vector(d_a, d_b, d_c);
     h_c = d_c;
 
 #ifdef USE_OPENMP
