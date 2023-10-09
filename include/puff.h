@@ -6,9 +6,8 @@
 #endif
 #include "SparseMatrix.h"
 #include "FFT_Conv3D.h"
-typedef thrust::complex<double> complex_d;
-typedef thrust::complex<float> complex_f;
 
 namespace puff {
-
+	using complex_d = thrust::complex<double>;
+	using complex_f = thrust::complex<float>;
 }
