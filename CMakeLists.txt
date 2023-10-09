@@ -25,33 +25,26 @@ project(PUFF VERSION 0.0.1 LANGUAGES CXX CUDA)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# For the simpicity of compilation output information
-# No warnings globally
-# Use it carefully
-option(NO_WARNINGS CACHE OFF)
-if(NO_WARNINGS)
-    if(MSVC)
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /w")
-    else()
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -w")
-    endif()
-    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -w")
-endif()
-
 # OpenMP
 find_package(OpenMP)
 if(OpenMP_CXX_FOUND)
     # pass definition USE_OPENMP to compiler
     add_definitions(-DUSE_OPENMP)
+    # pass -fopenmp to host compiler
+    if(MSVC)
+        set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcompiler \"/openmp\"")
+    else()
+        set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcompiler -fopenmp")
+    endif()
 endif()
 
 # CUDA part
 find_package(CUDAToolkit REQUIRED)
 enable_language(CUDA)
 # set CUDA enviroment
- set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -allow-unsupported-compiler --extended-lambda")
- set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -m64 -use_fast_math -Wno-deprecated-gpu-targets")
- set(CMAKE_CUDA_FLAGS_RELEASE "${CMAKE_CUDA_FLAGS} -O3")
+set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -allow-unsupported-compiler --extended-lambda")
+set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -m64 -use_fast_math -Wno-deprecated-gpu-targets")
+set(CMAKE_CUDA_FLAGS_RELEASE "${CMAKE_CUDA_FLAGS} -O3")
 
 # MKL part
 set(MKL_LINK static)
@@ -96,26 +89,6 @@ if(BUILD_BENCHMARK)
     endif()
 endif()
 
-# if BUILD_TEST is on
-option(BUILD_TEST CACHE ON)
-if(BUILD_TEST)
-    add_executable(test_host_device ${CMAKE_SOURCE_DIR}/tests/test_host_device.cu)
-    target_include_directories(test_host_device PUBLIC ${CMAKE_SOURCE_DIR}/include)
-    target_include_directories(test_host_device PUBLIC ${CUSP_INCLUDE_DIR})
-    target_compile_options(test_host_device PUBLIC $<TARGET_PROPERTY:MKL::MKL,INTERFACE_COMPILE_OPTIONS>)
-    target_include_directories(test_host_device PUBLIC $<TARGET_PROPERTY:MKL::MKL,INTERFACE_INCLUDE_DIRECTORIES>)
-    target_link_libraries(test_host_device PUBLIC $<LINK_ONLY:MKL::MKL>)
-    target_link_libraries(test_host_device PUBLIC 
-                                            CUDA::cufftw
-                                            CUDA::cufft
-                                            CUDA::cudart
-                                            )
-    #link OpenMP
-    if(OpenMP_CXX_FOUND)
-        target_include_directories(test_host_device PUBLIC ${OpenMP_CXX_INCLUDE_DIRS})
-        target_link_libraries(test_host_device PUBLIC OpenMP::OpenMP_CXX)     
-    endif()
-endif()
 
 # if BUILD_EXAMPLE is on
 option(BUILD_EXAMPLE CACHE ON)
@@ -137,3 +110,40 @@ if(BUILD_EXAMPLE)
         target_link_libraries(example_host_device PUBLIC OpenMP::OpenMP_CXX)
     endif()
 endif() 
+
+
+# if BUILD_TEST is on
+option(BUILD_TEST CACHE ON)
+if(BUILD_TEST)
+    # GTest package
+    include(FetchContent)
+    FetchContent_Declare(
+    googletest
+    GIT_REPOSITORY https://github.com/google/googletest.git
+    GIT_TAG release-1.12.1
+    )
+    # For Windows: Prevent overriding the parent project's compiler/linker settings
+    set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(googletest)
+    include(GoogleTest)
+
+    # Test
+    add_executable(test_host_device ${CMAKE_SOURCE_DIR}/tests/test_host_device.cu)
+    target_link_libraries(test_host_device PUBLIC GTest::gtest_main)
+    target_include_directories(test_host_device PUBLIC ${CMAKE_SOURCE_DIR}/include)
+    target_include_directories(test_host_device PUBLIC ${CUSP_INCLUDE_DIR})
+    target_compile_options(test_host_device PUBLIC $<TARGET_PROPERTY:MKL::MKL,INTERFACE_COMPILE_OPTIONS>)
+    target_include_directories(test_host_device PUBLIC $<TARGET_PROPERTY:MKL::MKL,INTERFACE_INCLUDE_DIRECTORIES>)
+    target_link_libraries(test_host_device PUBLIC $<LINK_ONLY:MKL::MKL>)
+    target_link_libraries(test_host_device PUBLIC 
+                                            CUDA::cufftw
+                                            CUDA::cufft
+                                            CUDA::cudart
+                                            )
+    #link OpenMP
+    if(OpenMP_CXX_FOUND)
+        target_include_directories(test_host_device PUBLIC ${OpenMP_CXX_INCLUDE_DIRS})
+        target_link_libraries(test_host_device PUBLIC OpenMP::OpenMP_CXX)     
+    endif()
+    gtest_discover_tests(test_host_device)
+endif()
