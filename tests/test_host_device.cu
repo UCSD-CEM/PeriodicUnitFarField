@@ -103,3 +103,66 @@ TEST(PUFF, Check_Complex_Array_Device)
         EXPECT_EQ(h_c[i], puff::complex_d(2.0 * i * i, 0.0));
     }
 }
+
+TEST(PUFF, Check_Complex_SpMV_Host)
+{
+    puff::Vector_h<puff::complex_d> x(N);
+    puff::Vector_h<puff::complex_d> y(N);
+    puff::SparseMatrix_h<puff::complex_d> A;
+
+    for(int i = 0; i < N; i++)
+    {
+        x[i] = puff::complex_d(1, 1);
+        A.insert_entry(i, N - 1 - i, puff::complex_d(i, -i));
+    }
+    A.make_matrix();
+
+    // Multiply y = A * x
+    A.SpMV(x, y);
+    for(int i = 0; i < N; i++)
+    {
+        EXPECT_EQ(y[i], puff::complex_d(2.0 * i, 0.0));
+    }
+
+    // Transpose multiply y = A' * x
+    A.SpMV(x, y, true);
+    for(int i = 0; i < N; i++)
+    {
+       EXPECT_EQ(y[i], puff::complex_d(2.0 * (N - 1 - i), 0.0));
+    }
+
+}
+
+TEST(PUFF, Check_Complex_SpMV_Device)
+{
+    puff::Vector_h<puff::complex_d> h_x(N);
+    puff::Vector_h<puff::complex_d> h_y(N);
+
+    puff::Vector_d<puff::complex_d> d_x(N);
+    puff::Vector_d<puff::complex_d> d_y(N);
+    puff::SparseMatrix_d<puff::complex_d> A;
+
+    for(int i = 0; i < N; i++)
+    {
+        h_x[i] = puff::complex_d(1, 1);
+        A.insert_entry(i, N - 1 - i, puff::complex_d(i, -i));
+    }
+    A.make_matrix();
+    d_x = h_x;
+    // Multiply y = A * x
+    A.SpMV(d_x, d_y);
+    h_y = d_y;
+    for(int i = 0; i < N; i++)
+    {
+        EXPECT_EQ(h_y[i], puff::complex_d(2.0 * i, 0.0));
+    }
+
+    // Transpose multiply y = A' * x
+    A.SpMV(d_x, d_y, true);
+    h_y = d_y;
+    for(int i = 0; i < N; i++)
+    {
+       EXPECT_EQ(h_y[i], puff::complex_d(2.0 * (N - 1 - i), 0.0));
+    }
+
+}
