@@ -21,10 +21,10 @@ class FFT3D{
 
 
 template<typename ValueType, typename MemorySpace> // Derived class
-class CONV3D{
+class CCONV3D{
     public:
-        CONV3D() {}
-        ~CONV3D() {}
+        CCONV3D() {}
+        ~CCONV3D() {}
 
     private:
         FFT3D<ValueType, MemorySpace> fft3d;
@@ -37,11 +37,11 @@ template<typename ValueType>
 using FFT3D_d = FFT3D<ValueType, cusp::device_memory>;
 
 template<typename ValueType>
-using CONV3D_h = CONV3D<ValueType, cusp::host_memory>;
+using CCONV3D_h = CCONV3D<ValueType, cusp::host_memory>;
 
 template<typename ValueType>
-using CONV3D_d = CONV3D<ValueType, cusp::device_memory>;
+using CCONV3D_d = CCONV3D<ValueType, cusp::device_memory>;
 
 }
 
-#include "details/FFT_Conv3D.inl"
+#include "details/CConv3D.inl"
