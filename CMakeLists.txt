@@ -53,11 +53,6 @@ set(MKL_INTERFACE_FULL intel_lp64)
 find_package(MKL CONFIG REQUIRED)
 
 # Third party libraries
-set(CMAKE_CUDA_ARCHITECTURES native)
-option(BUILD_ALL_CUDA_ARCHS "Build for all CUDA architectures supported" OFF)
-if(BUILD_ALL_CUDA_ARCHS)
-    set(CMAKE_CUDA_ARCHITECTURES all)   
-endif()
 # cusp
 set(CUSP_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/third_party/cusplibrary)
 
@@ -86,6 +81,8 @@ if(BUILD_BENCHMARK)
         target_include_directories(benchmark_host_device PUBLIC ${OpenMP_CXX_INCLUDE_DIRS})
         target_link_libraries(benchmark_host_device PUBLIC OpenMP::OpenMP_CXX)
     endif()
+    # CUDA Architecture
+    set_property(TARGET benchmark_host_device PROPERTY CUDA_ARCHITECTURES all)
 endif()
 
 
@@ -108,6 +105,8 @@ if(BUILD_EXAMPLE)
         target_include_directories(example_host_device PUBLIC ${OpenMP_CXX_INCLUDE_DIRS})
         target_link_libraries(example_host_device PUBLIC OpenMP::OpenMP_CXX)
     endif()
+    # CUDA Architecture
+    set_property(TARGET example_host_device PROPERTY CUDA_ARCHITECTURES all)
 endif() 
 
 
@@ -145,4 +144,6 @@ if(BUILD_TEST)
         target_link_libraries(test_host_device PUBLIC OpenMP::OpenMP_CXX)     
     endif()
     gtest_discover_tests(test_host_device)
+    # CUDA Architecture
+    set_property(TARGET test_host_device PROPERTY CUDA_ARCHITECTURES all)
 endif()
