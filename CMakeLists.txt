@@ -55,6 +55,8 @@ find_package(MKL CONFIG REQUIRED)
 # Third party libraries
 # cusp
 set(CUSP_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/third_party/cusplibrary)
+# cxxopts
+set(CXXOPTS_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/third_party/cxxopts/include)
 
 
 # Set output path
@@ -68,6 +70,7 @@ if(BUILD_BENCHMARK)
     add_executable(benchmark_host_device ${CMAKE_SOURCE_DIR}/benchmarks/benchmark_host_device.cu)
     target_include_directories(benchmark_host_device PUBLIC ${CMAKE_SOURCE_DIR}/include)
     target_include_directories(benchmark_host_device PUBLIC ${CUSP_INCLUDE_DIR})
+    target_include_directories(benchmark_host_device PUBLIC ${CXXOPTS_INCLUDE_DIR})
     target_compile_options(benchmark_host_device PUBLIC $<TARGET_PROPERTY:MKL::MKL,INTERFACE_COMPILE_OPTIONS>)
     target_include_directories(benchmark_host_device PUBLIC $<TARGET_PROPERTY:MKL::MKL,INTERFACE_INCLUDE_DIRECTORIES>)
     target_link_libraries(benchmark_host_device PUBLIC $<LINK_ONLY:MKL::MKL>)
@@ -92,6 +95,7 @@ if(BUILD_EXAMPLE)
     add_executable(example_host_device ${CMAKE_SOURCE_DIR}/examples/example_host_device.cu)
     target_include_directories(example_host_device PUBLIC ${CMAKE_SOURCE_DIR}/include)
     target_include_directories(example_host_device PUBLIC ${CUSP_INCLUDE_DIR})
+    target_include_directories(example_host_device PUBLIC ${CXXOPTS_INCLUDE_DIR})
     target_compile_options(example_host_device PUBLIC $<TARGET_PROPERTY:MKL::MKL,INTERFACE_COMPILE_OPTIONS>)
     target_include_directories(example_host_device PUBLIC $<TARGET_PROPERTY:MKL::MKL,INTERFACE_INCLUDE_DIRECTORIES>)
     target_link_libraries(example_host_device PUBLIC $<LINK_ONLY:MKL::MKL>)
@@ -130,6 +134,7 @@ if(BUILD_TEST)
     target_link_libraries(test_host_device PUBLIC GTest::gtest_main)
     target_include_directories(test_host_device PUBLIC ${CMAKE_SOURCE_DIR}/include)
     target_include_directories(test_host_device PUBLIC ${CUSP_INCLUDE_DIR})
+    target_include_directories(test_host_device PUBLIC ${CXXOPTS_INCLUDE_DIR})
     target_compile_options(test_host_device PUBLIC $<TARGET_PROPERTY:MKL::MKL,INTERFACE_COMPILE_OPTIONS>)
     target_include_directories(test_host_device PUBLIC $<TARGET_PROPERTY:MKL::MKL,INTERFACE_INCLUDE_DIRECTORIES>)
     target_link_libraries(test_host_device PUBLIC $<LINK_ONLY:MKL::MKL>)
