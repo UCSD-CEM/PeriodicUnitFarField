@@ -8,6 +8,6 @@
 #include "CConv3D.h"
 
 namespace puff {
-	using complex_d = thrust::complex<double>;
-	using complex_f = thrust::complex<float>;
+	using dcomplex = thrust::complex<double>;
+	using fcomplex = thrust::complex<float>;
 }
