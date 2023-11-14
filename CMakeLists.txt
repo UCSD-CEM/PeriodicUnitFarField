@@ -10,6 +10,7 @@ if (MSVC)
     set(CMAKE_GENERATOR_PLATFORM x64)
 endif()
 
+set(CMAKE_CUDA_ARCHITECTURES all)
 
 # Release type
 option(BUILD_DEBUG CACHE OFF)
