@@ -87,7 +87,7 @@ namespace puff {
 
             void insert_entry(IndexType row, IndexType col, ValueType val) {
                 auto key = row_col_to_key(row, col);
-                typename oneapi::tbb::concurrent_hash_map<uint64_t, ValueType>::accessor accessor;
+                typename oneapi::tbb::concurrent_hash_map<KEY_TYPE, ValueType>::accessor accessor;
                 if(entries.find(accessor, key))
                     accessor->second += val;
                 else
