@@ -8,7 +8,8 @@
 #include <thrust/device_ptr.h>
 #include <mutex>
 #include <vector>
-#include <unordered_map>
+//#include <unordered_map>
+#include "oneapi/tbb/concurrent_hash_map.h"
 #include <string>
 #include <limits>
 
@@ -85,19 +86,18 @@ namespace puff {
 
 
             void insert_entry(IndexType row, IndexType col, ValueType val) {
-                auto row_col_string = row_col_to_key(row, col);
-                {
-                    std::lock_guard<std::mutex> lock(mtx);
-                    entries[row_col_string] = val;
-                }
+                auto key = row_col_to_key(row, col);
+                typename oneapi::tbb::concurrent_hash_map<uint64_t, ValueType>::accessor accessor;
+                if(entries.find(accessor, key))
+                    accessor->second += val;
+                else
+                    entries.insert(std::make_pair(key, val));
             }
 
             void remove_entry(IndexType row, IndexType col) {
-                auto row_col_string = row_col_to_key(row, col);
-                {
-                    std::lock_guard<std::mutex> lock(mtx);
-                    entries.erase(row_col_string);
-                }
+                auto key = row_col_to_key(row, col);
+                std::lock_guard<std::mutex> lock(mtx);
+                entries.remove(key);
             }
 
             void make_matrix()
@@ -247,17 +247,23 @@ namespace puff {
             SparseMatrixView<IndexType, ValueType, MemorySpace> matrix_t;
             Vector<IndexType, MemorySpace> permutation; // permutation for transpose
 
-            std::unordered_map<KEY_TYPE, ValueType> entries;
+            oneapi::tbb::concurrent_hash_map<KEY_TYPE, ValueType> entries; // Use string for better hashing without potential hash collision
             // mutex lock
             std::mutex mtx;
 
             KEY_TYPE row_col_to_key(IndexType row, IndexType col) {
                 // shift row by 32 bits and add col
                 return ((KEY_TYPE)row << 32) + col;
+            KEY_TYPE row_col_to_key(IndexType row, IndexType col) {
+                // shift row by 32 bits and add col
+                return ((KEY_TYPE)row << 32) + col;
             }
 
             std::pair<IndexType, IndexType> key_to_row_col(const KEY_TYPE& key)
+            std::pair<IndexType, IndexType> key_to_row_col(const KEY_TYPE& key)
             {
+                IndexType row = (IndexType)(key >> 32);
+                IndexType col = (IndexType)(key & 0xffffffff);
                 IndexType row = (IndexType)(key >> 32);
                 IndexType col = (IndexType)(key & 0xffffffff);
                 return std::make_pair(row, col);
