@@ -4,13 +4,56 @@
 
 using namespace puff;
 
+void benchmark_SparseMatrix_Insertion_Host(int N)
+{
+    SparseMatrix_h<double> A;
+    
+    auto start = std::chrono::high_resolution_clock::now();
+    #pragma omp parallel for
+    for (int i = 0; i < N; i++)
+        A.insert_entry(i, i, 1.0);
+    auto end = std::chrono::high_resolution_clock::now();
+    std::cout << "Insertion on host of size " << N << ": " << \
+        std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << \
+        " us" << std::endl;
+
+    start = std::chrono::high_resolution_clock::now();
+    A.make_matrix();
+    end = std::chrono::high_resolution_clock::now();
+    std::cout << "Make matrix on host of size " << N << ": " << \
+        std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << \
+        " us" << std::endl;
+}
+
+void benchmark_SparseMatrix_Insertion_Device(int N)
+{
+    SparseMatrix_d<double> A;
+    
+    auto start = std::chrono::high_resolution_clock::now();
+    #pragma omp parallel for
+    for (int i = 0; i < N; i++)
+        A.insert_entry(i, i, 1.0);
+    auto end = std::chrono::high_resolution_clock::now();
+    std::cout << "Insertion on host of size " << N << ": " << \
+        std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << \
+        " us" << std::endl;
+
+    start = std::chrono::high_resolution_clock::now();
+    A.make_matrix();
+    end = std::chrono::high_resolution_clock::now();
+    std::cout << "Make matrix on host of size " << N << ": " << \
+        std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << \
+        " us" << std::endl;
+}
+
+
 void benchmark_SpMV_Host(int N)
 {
-    Vector_h<complex_d> x(N);
-    Vector_h<complex_d> y(N);
-    SparseMatrix_h<complex_d> A;
+    Vector_h<dcomplex> x(N);
+    Vector_h<dcomplex> y(N);
+    SparseMatrix_h<dcomplex> A;
     for (int i = 0; i < N; i++)
-        A.insert_entry(i, i, complex_d(1.0, -1.0));
+        A.insert_entry(i, i, dcomplex(1.0, -1.0));
 
     A.make_matrix();
 
@@ -50,11 +93,11 @@ void benchmark_SpMV_Host(int N)
 
 void benchmark_SpMV_Device(int N)
 {
-    Vector_d<complex_d> x(N);
-    Vector_d<complex_d> y(N);
-    SparseMatrix_d<complex_d> A;
+    Vector_d<dcomplex> x(N);
+    Vector_d<dcomplex> y(N);
+    SparseMatrix_d<dcomplex> A;
     for (int i = 0; i < N; i++)
-        A.insert_entry(i, i, complex_d(1.0, -1.0));
+        A.insert_entry(i, i, dcomplex(1.0, -1.0));
 
     A.make_matrix();
 
@@ -102,6 +145,8 @@ int main()
 #else
     std::cout << "**********Benchmark initialized without OpenMP**********" << std::endl;
 #endif
+    benchmark_SparseMatrix_Insertion_Host(1e8);
+    benchmark_SparseMatrix_Insertion_Device(1e8);
     benchmark_SpMV_Host(1e6);
     benchmark_SpMV_Device(1e6);
     return 0;

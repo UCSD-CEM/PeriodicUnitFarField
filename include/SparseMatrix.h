@@ -12,8 +12,8 @@
 #include <string>
 #include <limits>
 
-#define INDEX_TYPE size_t // We pre-define the IndexType as a size_t for maximal compatibility
-static std::string delimiter = "*";
+#define INDEX_TYPE uint32_t
+#define KEY_TYPE uint64_t
 
 namespace puff {
 
@@ -85,7 +85,7 @@ namespace puff {
 
 
             void insert_entry(IndexType row, IndexType col, ValueType val) {
-                std::string row_col_string = row_col_to_string(row, col);
+                auto row_col_string = row_col_to_key(row, col);
                 {
                     std::lock_guard<std::mutex> lock(mtx);
                     entries[row_col_string] = val;
@@ -93,7 +93,7 @@ namespace puff {
             }
 
             void remove_entry(IndexType row, IndexType col) {
-                std::string row_col_string = row_col_to_string(row, col);
+                auto row_col_string = row_col_to_key(row, col);
                 {
                     std::lock_guard<std::mutex> lock(mtx);
                     entries.erase(row_col_string);
@@ -103,17 +103,24 @@ namespace puff {
             void make_matrix()
             {
                 std::lock_guard<std::mutex> lock(mtx);
-                Vector<IndexType, cusp::host_memory> h_I;
-                Vector<IndexType, cusp::host_memory> h_J;
-                Vector<ValueType, cusp::host_memory> h_V;
-                for(auto& [row_col_string, value] : entries)
+                Vector<IndexType, cusp::host_memory> h_I(entries.size());
+                Vector<IndexType, cusp::host_memory> h_J(entries.size());
+                Vector<ValueType, cusp::host_memory> h_V(entries.size());
+
+                int nnz = 0;
+                for(auto& [row_col_key, value] : entries)
                 {
-                    auto [row, col] = string_to_row_col(row_col_string);
+                    auto [row, col] = key_to_row_col(row_col_key);
                     if(value == ValueType(0)) continue; // No 0 element
-                    h_I.push_back(row);
-                    h_J.push_back(col);
-                    h_V.push_back(value);
-                }
+                    h_I[nnz] = row;
+                    h_J[nnz] = col;
+                    h_V[nnz] = value;
+                    nnz++;
+                }      
+
+                h_I.resize(nnz);
+                h_J.resize(nnz);
+                h_V.resize(nnz);
                 
                 
                 // sort triplets by (i,j) index using two stable sorts (first by J, then by I)
@@ -138,37 +145,28 @@ namespace puff {
                 }
                 h_row_ptrs[numRows] = h_I.size(); // Set the last element of row_ptrs
 
-                // Move to prescribed memory space
-                Vector<IndexType, MemorySpace> I(h_row_ptrs);
-                Vector<IndexType, MemorySpace> J(h_J);
-                Vector<ValueType, MemorySpace> V(h_V);
-
+                
                 // resize matrix
-                matrix.resize(numRows, numCols, V.size());
-
+                matrix.resize(numRows, numCols, h_V.size());
+                // Move to prescribed memory space
                 // Insert I to matrix.row_offsets
-                thrust::copy(I.begin(), I.end(), matrix.row_offsets.begin());
+                thrust::copy(h_row_ptrs.begin(), h_row_ptrs.end(), matrix.row_offsets.begin());
                 // Insert J to matrix.column_indices
-                thrust::copy(J.begin(), J.end(), matrix.column_indices.begin());
+                thrust::copy(h_J.begin(), h_J.end(), matrix.column_indices.begin());
                 // Insert V to matrix.values
-                thrust::copy(V.begin(), V.end(), matrix.values.begin());
+                thrust::copy(h_V.begin(), h_V.end(), matrix.values.begin());
                 */
 
                 /*****************COO Matrix********************/
-                // Move to prescribed memory space
-                Vector<IndexType, MemorySpace> I(h_I);
-                Vector<IndexType, MemorySpace> J(h_J);
-                Vector<ValueType, MemorySpace> V(h_V);
-
                 // resize matrix
-                matrix.resize(numRows, numCols, V.size());
-
+                matrix.resize(numRows, numCols, h_V.size());
+                // Move to prescribed memory space
                 // Insert I to matrix.row_offsets
-                thrust::copy(I.begin(), I.end(), matrix.row_indices.begin());
+                thrust::copy(h_I.begin(), h_I.end(), matrix.row_indices.begin());
                 // Insert J to matrix.column_indices
-                thrust::copy(J.begin(), J.end(), matrix.column_indices.begin());
+                thrust::copy(h_J.begin(), h_J.end(), matrix.column_indices.begin());
                 // Insert V to matrix.values
-                thrust::copy(V.begin(), V.end(), matrix.values.begin());
+                thrust::copy(h_V.begin(), h_V.end(), matrix.values.begin());
 
                 // Make the transpose coo_matrix view
                 permutation = Vector<IndexType, MemorySpace>(cusp::counting_array<IndexType>(matrix.num_entries));
@@ -249,26 +247,19 @@ namespace puff {
             SparseMatrixView<IndexType, ValueType, MemorySpace> matrix_t;
             Vector<IndexType, MemorySpace> permutation; // permutation for transpose
 
-            std::unordered_map<std::string, ValueType> entries; // Use string for better hashing without potential hash collision
+            std::unordered_map<KEY_TYPE, ValueType> entries;
             // mutex lock
             std::mutex mtx;
 
-            std::string row_col_to_string(IndexType row, IndexType col) {
-                return std::to_string(row) + delimiter + std::to_string(col); //seperate by space
+            KEY_TYPE row_col_to_key(IndexType row, IndexType col) {
+                // shift row by 32 bits and add col
+                return ((KEY_TYPE)row << 32) + col;
             }
 
-            std::pair<IndexType, IndexType> string_to_row_col(const std::string& row_col_string)
+            std::pair<IndexType, IndexType> key_to_row_col(const KEY_TYPE& key)
             {
-                std::string row_string = row_col_string.substr(0, row_col_string.find(delimiter));
-                std::string col_string = row_col_string.substr(row_col_string.find(delimiter) + 1, row_col_string.length());
-                IndexType row = 0;
-                IndexType col = 0;
-                for(IndexType i = 0; i < row_string.length(); i++) {
-                    row = row * 10 + (row_string[i] - '0');
-                }
-                for(IndexType i = 0; i < col_string.length(); i++) {
-                    col = col * 10 + (col_string[i] - '0');
-                }
+                IndexType row = (IndexType)(key >> 32);
+                IndexType col = (IndexType)(key & 0xffffffff);
                 return std::make_pair(row, col);
             }
             
