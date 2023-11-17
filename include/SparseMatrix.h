@@ -245,23 +245,17 @@ namespace puff {
             SparseMatrixView<IndexType, ValueType, MemorySpace> matrix_t;
             Vector<IndexType, MemorySpace> permutation; // permutation for transpose
 
-            oneapi::tbb::concurrent_hash_map<KEY_TYPE, ValueType> entries; // Use string for better hashing without potential hash collision
+            oneapi::tbb::concurrent_hash_map<KEY_TYPE, ValueType> entries;
             // mutex lock
             std::mutex mtx;
 
             KEY_TYPE row_col_to_key(IndexType row, IndexType col) {
                 // shift row by 32 bits and add col
                 return ((KEY_TYPE)row << 32) + col;
-            KEY_TYPE row_col_to_key(IndexType row, IndexType col) {
-                // shift row by 32 bits and add col
-                return ((KEY_TYPE)row << 32) + col;
             }
 
             std::pair<IndexType, IndexType> key_to_row_col(const KEY_TYPE& key)
-            std::pair<IndexType, IndexType> key_to_row_col(const KEY_TYPE& key)
             {
-                IndexType row = (IndexType)(key >> 32);
-                IndexType col = (IndexType)(key & 0xffffffff);
                 IndexType row = (IndexType)(key >> 32);
                 IndexType col = (IndexType)(key & 0xffffffff);
                 return std::make_pair(row, col);
