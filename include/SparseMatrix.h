@@ -117,12 +117,10 @@ namespace puff {
                     h_V[nnz] = value;
                     nnz++;
                 }      
-
-                h_I.resize(nnz);
-                h_J.resize(nnz);
-                h_V.resize(nnz);
-                
-                
+                h_I.shrink_to_fit();
+                h_J.shrink_to_fit();
+                h_V.shrink_to_fit();
+                entries.clear(); // empty the hash map
                 // sort triplets by (i,j) index using two stable sorts (first by J, then by I)
                 thrust::stable_sort_by_key(h_J.begin(), h_J.end(), thrust::make_zip_iterator(thrust::make_tuple(h_I.begin(), h_V.begin())));
                 thrust::stable_sort_by_key(h_I.begin(), h_I.end(), thrust::make_zip_iterator(thrust::make_tuple(h_J.begin(), h_V.begin())));
