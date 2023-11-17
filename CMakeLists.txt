@@ -31,8 +31,6 @@ find_package(OpenMP REQUIRED)
 # pass definition USE_OPENMP to compiler
 # Check this: https://github.com/NVIDIA/cuda-samples/issues/102
 add_definitions(-DUSE_OPENMP)
-set(CMAKE_CUDA_HOST_COMPILER ${Intel_CXX_COMPILER})
-set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -ccbin ${Intel_CXX_COMPILER}")
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcompiler -fopenmp -fPIE")  
 
 
