@@ -27,17 +27,12 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # OpenMP
-find_package(OpenMP)
-if(OpenMP_CXX_FOUND)
-    # pass definition USE_OPENMP to compiler
-    add_definitions(-DUSE_OPENMP)
-    # pass -fopenmp to host compiler
-    if(MSVC)
-        set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcompiler \"/openmp\"")
-    else()
-        set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcompiler -fopenmp")
-    endif()
-endif()
+find_package(OpenMP REQUIRED)
+# pass definition USE_OPENMP to compiler
+# Check this: https://github.com/NVIDIA/cuda-samples/issues/102
+add_definitions(-DUSE_OPENMP)
+set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcompiler -fopenmp -fPIE")  
+
 
 # CUDA part
 find_package(CUDAToolkit REQUIRED)
@@ -52,6 +47,10 @@ set(MKL_LINK static)
 set(MKL_ARCH intel64)
 set(MKL_INTERFACE_FULL intel_lp64)
 find_package(MKL CONFIG REQUIRED)
+
+# OneAPI TBB
+find_package(TBB REQUIRED)
+find_package(Threads)
 
 # Third party libraries
 # cusp
@@ -81,10 +80,12 @@ if(BUILD_BENCHMARK)
                                                 CUDA::cudart
                                                 )
     #link OpenMP
-    if(OpenMP_CXX_FOUND)
-        target_include_directories(benchmark_host_device PUBLIC ${OpenMP_CXX_INCLUDE_DIRS})
-        target_link_libraries(benchmark_host_device PUBLIC OpenMP::OpenMP_CXX)
-    endif()
+    target_include_directories(benchmark_host_device PUBLIC ${OpenMP_CXX_INCLUDE_DIRS})
+    target_link_libraries(benchmark_host_device PUBLIC OpenMP::OpenMP_CXX)
+
+    # link TBB
+    target_link_libraries(benchmark_host_device PUBLIC irc TBB::tbb Threads::Threads)
+
     # CUDA Architecture
     set_property(TARGET benchmark_host_device PROPERTY CUDA_ARCHITECTURES all)
 endif()
@@ -106,10 +107,12 @@ if(BUILD_EXAMPLE)
                                             CUDA::cudart
                                             )
     #link OpenMP
-    if(OpenMP_CXX_FOUND)
-        target_include_directories(example_host_device PUBLIC ${OpenMP_CXX_INCLUDE_DIRS})
-        target_link_libraries(example_host_device PUBLIC OpenMP::OpenMP_CXX)
-    endif()
+    target_include_directories(example_host_device PUBLIC ${OpenMP_CXX_INCLUDE_DIRS})
+    target_link_libraries(example_host_device PUBLIC OpenMP::OpenMP_CXX)
+    
+    # link TBB
+    target_link_libraries(example_host_device PUBLIC irc TBB::tbb Threads::Threads)
+
     # CUDA Architecture
     set_property(TARGET example_host_device PROPERTY CUDA_ARCHITECTURES all)
 endif() 
@@ -145,10 +148,12 @@ if(BUILD_TEST)
                                             CUDA::cudart
                                             )
     #link OpenMP
-    if(OpenMP_CXX_FOUND)
-        target_include_directories(test_host_device PUBLIC ${OpenMP_CXX_INCLUDE_DIRS})
-        target_link_libraries(test_host_device PUBLIC OpenMP::OpenMP_CXX)     
-    endif()
+    target_include_directories(test_host_device PUBLIC ${OpenMP_CXX_INCLUDE_DIRS})
+    target_link_libraries(test_host_device PUBLIC OpenMP::OpenMP_CXX)
+    
+    # link TBB
+    target_link_libraries(test_host_device PUBLIC irc TBB::tbb Threads::Threads)
+
     gtest_discover_tests(test_host_device)
     # CUDA Architecture
     set_property(TARGET test_host_device PROPERTY CUDA_ARCHITECTURES all)

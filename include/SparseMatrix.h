@@ -8,7 +8,8 @@
 #include <thrust/device_ptr.h>
 #include <mutex>
 #include <vector>
-#include <unordered_map>
+//#include <unordered_map>
+#include "oneapi/tbb/concurrent_hash_map.h"
 #include <string>
 #include <limits>
 
@@ -85,19 +86,18 @@ namespace puff {
 
 
             void insert_entry(IndexType row, IndexType col, ValueType val) {
-                auto row_col_string = row_col_to_key(row, col);
-                {
-                    std::lock_guard<std::mutex> lock(mtx);
-                    entries[row_col_string] = val;
-                }
+                auto key = row_col_to_key(row, col);
+                typename oneapi::tbb::concurrent_hash_map<KEY_TYPE, ValueType>::accessor accessor;
+                if(entries.find(accessor, key))
+                    accessor->second += val;
+                else
+                    entries.insert(std::make_pair(key, val));
             }
 
             void remove_entry(IndexType row, IndexType col) {
-                auto row_col_string = row_col_to_key(row, col);
-                {
-                    std::lock_guard<std::mutex> lock(mtx);
-                    entries.erase(row_col_string);
-                }
+                auto key = row_col_to_key(row, col);
+                std::lock_guard<std::mutex> lock(mtx);
+                entries.remove(key);
             }
 
             void make_matrix()
@@ -117,12 +117,10 @@ namespace puff {
                     h_V[nnz] = value;
                     nnz++;
                 }      
-
-                h_I.resize(nnz);
-                h_J.resize(nnz);
-                h_V.resize(nnz);
-                
-                
+                h_I.shrink_to_fit();
+                h_J.shrink_to_fit();
+                h_V.shrink_to_fit();
+                entries.clear(); // empty the hash map
                 // sort triplets by (i,j) index using two stable sorts (first by J, then by I)
                 thrust::stable_sort_by_key(h_J.begin(), h_J.end(), thrust::make_zip_iterator(thrust::make_tuple(h_I.begin(), h_V.begin())));
                 thrust::stable_sort_by_key(h_I.begin(), h_I.end(), thrust::make_zip_iterator(thrust::make_tuple(h_J.begin(), h_V.begin())));
@@ -247,7 +245,7 @@ namespace puff {
             SparseMatrixView<IndexType, ValueType, MemorySpace> matrix_t;
             Vector<IndexType, MemorySpace> permutation; // permutation for transpose
 
-            std::unordered_map<KEY_TYPE, ValueType> entries;
+            oneapi::tbb::concurrent_hash_map<KEY_TYPE, ValueType> entries;
             // mutex lock
             std::mutex mtx;
 
