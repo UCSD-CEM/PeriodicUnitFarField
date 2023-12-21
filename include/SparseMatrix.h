@@ -17,6 +17,14 @@
 
 namespace puff {
 
+    template <typename T>
+    struct conjugate_functor {
+        __host__ __device__
+        thrust::complex<T> operator()(const thrust::complex<T>& z) const {
+            return thrust::complex<T>(z.real(), -z.imag());
+        }
+    };
+
     template<typename IndexType, typename ValueType, typename MemorySpace>
     using SparseMatrix = cusp::coo_matrix<IndexType, ValueType, MemorySpace>;        
 
@@ -116,11 +124,17 @@ namespace puff {
                     h_J[nnz] = col;
                     h_V[nnz] = value;
                     nnz++;
-                }      
+                }    
 
-                h_I.resize(nnz);
-                h_J.resize(nnz);
-                h_V.resize(nnz);
+                {
+                    // Free memory
+                    std::unordered_map<KEY_TYPE, ValueType> temp_entries;
+                    std::swap(entries, temp_entries); // force entries to free memory
+                }  
+
+                h_I.resize(nnz); h_I.shrink_to_fit();
+                h_J.resize(nnz); h_J.shrink_to_fit();
+                h_V.resize(nnz); h_V.shrink_to_fit();
                 
                 
                 // sort triplets by (i,j) index using two stable sorts (first by J, then by I)
@@ -184,8 +198,11 @@ namespace puff {
             void reset()
             {
                 std::lock_guard<std::mutex> lock(mtx);
-                matrix.resize(0, 0, 0);
-                entries.clear();
+                SparseMatrix<IndexType, ValueType, MemorySpace> temp_matrix(0, 0, 0);
+                swap(matrix, temp_matrix); // force matrix to free memory
+                
+                std::unordered_map<KEY_TYPE, ValueType> temp_entries;
+                swap(entries, temp_entries); // force entries to free memory
             }
 
             void print_matrix() {
@@ -193,32 +210,65 @@ namespace puff {
                 cusp::print(matrix);
             }
 
-            void SpMV(Vector<ValueType, MemorySpace>& x, Vector<ValueType, MemorySpace>& y, bool transpose = false) {            
-                if(&x == &y) {
-                    Vector<ValueType, MemorySpace> temp(x.size());
-                    if (transpose) {
-                        cusp::multiply(matrix_t, x, temp);
-                    } else {
-                        cusp::multiply(matrix, x, temp);
+            void SpMV(Vector<ValueType, MemorySpace>& x, 
+                      Vector<ValueType, MemorySpace>& y, 
+                      bool transpose = false, 
+                      bool conjugate = false) {     
+                
+                if constexpr(std::is_same_v<ValueType, thrust::complex<double>> ||
+                             std::is_same_v<ValueType, thrust::complex<float>> ||
+                             std::is_same_v<ValueType, thrust::complex<half>>)
+                {
+                    if(conjugate) {
+                        // Use the underlying type (double, float, half) for thrust::conj
+                        using UnderlyingType = typename ValueType::value_type;
+                        thrust::transform(matrix.values.begin(), matrix.values.end(), matrix.values.begin(), conjugate_functor<UnderlyingType>());
                     }
-                    y.swap(temp);
-                    return;
                 }
 
-                if (transpose) {
-                    cusp::multiply(matrix_t, x, y);
-                } else {
-                    cusp::multiply(matrix, x, y);
+                
+                if(&x == &y) 
+                {
+                    Vector<ValueType, MemorySpace> temp(x.size());
+                    if (transpose) 
+                        cusp::multiply(matrix_t, x, temp);
+                    else
+                        cusp::multiply(matrix, x, temp);
+                    y.swap(temp);
+                }
+                else
+                {
+                    if (transpose)
+                        cusp::multiply(matrix_t, x, y);
+                    else
+                        cusp::multiply(matrix, x, y);
+                }
+                
+                if constexpr(std::is_same_v<ValueType, thrust::complex<double>> ||
+                             std::is_same_v<ValueType, thrust::complex<float>> ||
+                             std::is_same_v<ValueType, thrust::complex<half>>)
+                {
+                    if(conjugate) {
+                        // Use the underlying type (double, float, half) for thrust::conj
+                        using UnderlyingType = typename ValueType::value_type;
+                        thrust::transform(matrix.values.begin(), matrix.values.end(), matrix.values.begin(), conjugate_functor<UnderlyingType>());
+                    }
                 }
             }
 
 
-            void SpMVP(ValueType alpha, Vector<ValueType, MemorySpace>& x, ValueType beta, Vector<ValueType, MemorySpace>& y, bool transpose = false) {
+            void SpMVP(ValueType alpha, 
+                       Vector<ValueType, MemorySpace>& x, 
+                       ValueType beta, 
+                       Vector<ValueType, MemorySpace>& y, 
+                       bool transpose = false, 
+                       bool conjugate = false) {
                 // y = alpha * A * x + beta * y
                 if (beta == 0)
                 {
                     // y = A * x
-                    if(alpha != 0) SpMV(x, y, transpose); 
+                    if(alpha != 0) 
+                        SpMV(x, y, transpose, conjugate); 
                     // y *= alpha;
                     if(alpha != 1)
                         thrust::transform(y.begin(), y.end(), thrust::make_constant_iterator(alpha), y.begin(), thrust::multiplies<ValueType>());
@@ -227,7 +277,8 @@ namespace puff {
                 {
                     Vector<ValueType, MemorySpace> temp(x.size(), 0);
                     // temp = A * x
-                    if(alpha != 0) SpMV(x, temp, transpose); 
+                    if(alpha != 0) 
+                        SpMV(x, temp, transpose, conjugate); 
                     // temp = alpha * temp
                     if(alpha != 0 && alpha != 1)
                         thrust::transform(temp.begin(), temp.end(), thrust::make_constant_iterator(alpha), temp.begin(), thrust::multiplies<ValueType>());

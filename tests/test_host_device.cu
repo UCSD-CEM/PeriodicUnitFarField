@@ -124,11 +124,25 @@ TEST(PUFF, Check_Complex_SpMV_Host)
         EXPECT_EQ(y[i], puff::dcomplex(2.0 * i, 0.0));
     }
 
+    // Conjugate multiply y = A^H * x
+    A.SpMV(x, y, false, true);
+    for(int i = 0; i < N; i++)
+    {
+        EXPECT_EQ(y[i], puff::dcomplex(0.0, 2.0 * i));
+    }
+
     // Transpose multiply y = A' * x
     A.SpMV(x, y, true);
     for(int i = 0; i < N; i++)
     {
        EXPECT_EQ(y[i], puff::dcomplex(2.0 * (N - 1 - i), 0.0));
+    }
+
+    // Conjugate transpose multiply y = A^H * x
+    A.SpMV(x, y, true, true);
+    for(int i = 0; i < N; i++)
+    {
+       EXPECT_EQ(y[i], puff::dcomplex(0.0, 2.0 * (N - 1 - i)));
     }
 
 }
@@ -157,12 +171,28 @@ TEST(PUFF, Check_Complex_SpMV_Device)
         EXPECT_EQ(h_y[i], puff::dcomplex(2.0 * i, 0.0));
     }
 
+    // Conjugate multiply y = A^H * x
+    A.SpMV(d_x, d_y, false, true);
+    h_y = d_y;
+    for(int i = 0; i < N; i++)
+    {
+        EXPECT_EQ(h_y[i], puff::dcomplex(0.0, 2.0 * i));
+    }
+
     // Transpose multiply y = A' * x
     A.SpMV(d_x, d_y, true);
     h_y = d_y;
     for(int i = 0; i < N; i++)
     {
        EXPECT_EQ(h_y[i], puff::dcomplex(2.0 * (N - 1 - i), 0.0));
+    }
+
+    // Conjugate transpose multiply y = A^H * x
+    A.SpMV(d_x, d_y, true, true);
+    h_y = d_y;
+    for(int i = 0; i < N; i++)
+    {
+       EXPECT_EQ(h_y[i], puff::dcomplex(0.0, 2.0 * (N - 1 - i)));
     }
 
 }
