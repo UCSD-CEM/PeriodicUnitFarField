@@ -309,8 +309,8 @@ namespace puff {
 
             std::pair<IndexType, IndexType> key_to_row_col(const KEY_TYPE& key)
             {
-                IndexType row = (IndexType)(key >> 32);
-                IndexType col = (IndexType)(key & 0xffffffff);
+                IndexType row = static_cast<IndexType>(key >> 32);
+                IndexType col = static_cast<IndexType>(key);
                 return std::make_pair(row, col);
             }
             
