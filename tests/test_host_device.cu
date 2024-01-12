@@ -196,3 +196,83 @@ TEST(PUFF, Check_Complex_SpMV_Device)
     }
 
 }
+
+TEST(PUFF, Check_spectral_radius_Host)
+{
+    puff::SparseMatrix_h<double> A;
+    for(int i = 0; i < N; i++)
+        A.insert_entry(i, i, i + 1);
+
+    A.make_matrix();
+
+    double rho = N ;
+    EXPECT_TRUE((std::abs(A.spectral_radius(100, true) - rho) / rho) < 0.01); // force using lanczos on purpose
+}
+
+TEST(PUFF, Check_spectral_radius_Device)
+{
+    puff::SparseMatrix_d<double> A;
+    for(int i = 0; i < N; i++)
+        A.insert_entry(i, i, i + 1);
+    
+    A.make_matrix();
+
+    double rho = N;
+    EXPECT_TRUE((std::abs(A.spectral_radius(100, false) - rho) / rho) < 0.01); // force using arnoldi on purpose
+}
+
+TEST(PUFF, Check_complex_gmres_host)
+{
+    puff::Vector_h<puff::dcomplex> x(N, puff::dcomplex(1, 1));
+    puff::Vector_h<puff::dcomplex> b(N);
+    puff::SparseMatrix_h<puff::dcomplex> A;
+
+    for(int i = 0; i < N; i++)
+        A.insert_entry(i, i, puff::dcomplex(i + N / 10, -(i + N / 10)));
+
+    A.make_matrix();
+
+    // Multiply b = A * x
+    A.SpMV(x, b);
+
+    // Set initial guess to zero
+    thrust::fill(x.begin(), x.end(), puff::dcomplex(0.0, 0.0));
+
+    // Solve Ax = b
+    A.gmres(x, b);
+
+    for(int i = 0; i < N; i++)
+    {
+        EXPECT_NEAR(x[i].real(), 1.0, 1e-3);
+        EXPECT_NEAR(x[i].imag(), 1.0, 1e-3);
+    }
+}
+
+TEST(PUFF, Check_complex_gmres_device)
+{
+    puff::Vector_h<puff::dcomplex> h_x(N);
+    puff::Vector_d<puff::dcomplex> d_x(N, puff::dcomplex(1, 1));
+    puff::Vector_d<puff::dcomplex> d_b(N);
+    puff::SparseMatrix_d<puff::dcomplex> A;
+
+    for(int i = 0; i < N; i++)
+        A.insert_entry(i, i, puff::dcomplex(i + N / 10, -(i + N / 10)));
+
+    A.make_matrix();
+
+    // Multiply b = A * x
+    A.SpMV(d_x, d_b);
+
+    // Set initial guess to zero
+    thrust::fill(d_x.begin(), d_x.end(), puff::dcomplex(0.0, 0.0));
+
+    // Solve Ax = b
+    A.gmres(d_x, d_b);
+    h_x = d_x;
+
+    for(int i = 0; i < N; i++)
+    {
+        EXPECT_NEAR(h_x[i].real(), 1.0, 1e-3);
+        EXPECT_NEAR(h_x[i].imag(), 1.0, 1e-3);
+    }
+}

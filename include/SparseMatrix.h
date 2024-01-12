@@ -1,10 +1,14 @@
 #pragma once
 
-#include "cusp/coo_matrix.h"
-#include "cusp/multiply.h"
-#include "cusp/transpose.h"
-#include "cusp/sort.h"
-#include "cusp/print.h"
+#include <cusp/coo_matrix.h>
+#include <cusp/multiply.h>
+#include <cusp/transpose.h>
+#include <cusp/sort.h>
+#include <cusp/print.h>
+#include <cusp/eigen/spectral_radius.h>
+#include <cusp/krylov/gmres.h>
+#include <cusp/monitor.h>
+#include <cusp/functional.h>
 #include <thrust/device_ptr.h>
 #include <mutex>
 #include <vector>
@@ -16,14 +20,6 @@
 #define KEY_TYPE uint64_t
 
 namespace puff {
-
-    template <typename T>
-    struct conjugate_functor {
-        __host__ __device__
-        thrust::complex<T> operator()(const thrust::complex<T>& z) const {
-            return thrust::complex<T>(z.real(), -z.imag());
-        }
-    };
 
     template<typename IndexType, typename ValueType, typename MemorySpace>
     using SparseMatrix = cusp::coo_matrix<IndexType, ValueType, MemorySpace>;        
@@ -219,11 +215,9 @@ namespace puff {
                              std::is_same_v<ValueType, thrust::complex<float>> ||
                              std::is_same_v<ValueType, thrust::complex<half>>)
                 {
-                    if(conjugate) {
-                        // Use the underlying type (double, float, half) for thrust::conj
-                        using UnderlyingType = typename ValueType::value_type;
-                        thrust::transform(matrix.values.begin(), matrix.values.end(), matrix.values.begin(), conjugate_functor<UnderlyingType>());
-                    }
+                    if(conjugate)
+                        thrust::transform(matrix.values.begin(), matrix.values.end(), matrix.values.begin(), \
+                            cusp::conj_functor<ValueType>());
                 }
 
                 
@@ -248,11 +242,9 @@ namespace puff {
                              std::is_same_v<ValueType, thrust::complex<float>> ||
                              std::is_same_v<ValueType, thrust::complex<half>>)
                 {
-                    if(conjugate) {
-                        // Use the underlying type (double, float, half) for thrust::conj
-                        using UnderlyingType = typename ValueType::value_type;
-                        thrust::transform(matrix.values.begin(), matrix.values.end(), matrix.values.begin(), conjugate_functor<UnderlyingType>());
-                    }
+                    if(conjugate)
+                        thrust::transform(matrix.values.begin(), matrix.values.end(), matrix.values.begin(), \
+                            cusp::conj_functor<ValueType>());
                 }
             }
 
@@ -290,7 +282,27 @@ namespace puff {
                 }
             }
 
-            
+            // Return the spectral radius (maximum of the absolute eigenvalues) of the matrix
+            ValueType spectral_radius(size_t k = 10, bool symmetric = false) 
+            {
+                return cusp::eigen::ritz_spectral_radius(matrix, k, symmetric);
+            }
+
+            // Solving Ax = b using GMRES
+            typedef typename cusp::norm_type<ValueType>::type Real; // Real is the type of the residual norm
+            ValueType gmres(Vector<ValueType, MemorySpace>& x, 
+                            Vector<ValueType, MemorySpace>& b, 
+                            size_t restart = 50, 
+                            size_t maxiter = 1000, 
+                            Real tol = Real(1e-6), 
+                            bool verbose = false) 
+            {
+                cusp::monitor<Real> monitor(b, maxiter, tol, 0, verbose);
+                cusp::krylov::gmres(matrix, x, b, restart, monitor);
+                return monitor.residual_norm();
+            }
+
+
         private:
             SparseMatrix<IndexType, ValueType, MemorySpace> matrix;
             // Transpose matrix view
